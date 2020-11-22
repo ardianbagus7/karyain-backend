@@ -7,6 +7,8 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Helpers\ResponseFormatter;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
@@ -14,10 +16,12 @@ class ProductController extends Controller
     public function all(Request $request)
     {
         $id = $request->input('id');
+        $user_id = $request->input('user_id');
         $limit = $request->input('limit', 6);
         $name = $request->input('name');
         $category = $request->input('category');
         $target_end = $request->input('target_end');
+        $total_donation = $request->input('total_donation');
 
         $price_from = $request->input('price_from');
         $price_to = $request->input('price_to');
@@ -27,6 +31,8 @@ class ProductController extends Controller
             $product = Product::find($id);
             $product->total_donation = $product->countTransactionsByProduct($product->id);
             $product->donator = $product->getAllSuccessTransactionByProduct($product->id);
+            $product->url_photo = $product->getUrlPhotoAttribute($product->photo_path);
+            $product->user = $product->user;
 
             if ($product) {
                 return ResponseFormatter::success(
@@ -42,13 +48,11 @@ class ProductController extends Controller
             }
         }
 
-        $product = Product::all()->map(function ($item, $key) {
-            $_item = $item->getAttributes();
-            $_item['total_donation'] =
-                $item->countTransactionsByProduct($item->id);
-            $_item['donator'] = $item->getAllSuccessTransactionByProduct($item->id);
-            return $_item;
-        });
+        $product = Product::query();
+
+        if ($user_id) {
+            $product->where('user_id', $user_id);
+        }
 
         if ($name) {
             $product->where('name', 'like', '%' . $name . '%');
@@ -66,9 +70,16 @@ class ProductController extends Controller
             $product->where('target_funding', '<=', $price_from);
         }
 
-        // $product->url_photo_path = $product->getPicturePathAttribute();
+        $products = array();
+        foreach ($product->latest()->get() as $item) {
+            $item->total_donation = $item->countTransactionsByProduct($item->id);
+            $item->donator =  $item->getAllSuccessTransactionByProduct($item->id);
+            $item->user = $item->user;
+            array_push($products, $item);
+        }
+
         return ResponseFormatter::success(
-            $product->paginate($limit),
+            collect($products)->paginate($limit),
             'Data list produk berhasil diambil'
         );
     }
@@ -78,15 +89,14 @@ class ProductController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => 'required',
-            'category' => 'required',
             'target_funding' => 'required',
             'target_end' => 'required',
-            'video_path' => 'required',
         ]);
 
         try {
 
             $product = Product::create([
+                'user_id' => Auth::user()->id,
                 'name' => $request->name,
                 'description' => $request->description,
                 'category' => $request->category,

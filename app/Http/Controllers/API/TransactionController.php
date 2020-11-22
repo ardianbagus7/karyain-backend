@@ -51,7 +51,7 @@ class TransactionController extends Controller
         }
 
         return ResponseFormatter::success(
-            $transaction->paginate($limit),
+            $transaction->latest()->paginate($limit),
             'Data list transaction berhasil diambil'
         );
     }
@@ -72,7 +72,6 @@ class TransactionController extends Controller
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'user_id' => 'required|exists:users,id',
             'total' => 'required',
             'status' => 'required',
             'message' => 'required',
@@ -80,7 +79,7 @@ class TransactionController extends Controller
 
         $transaction = Transaction::create([
             'product_id' => $request->product_id,
-            'user_id' => $request->user_id,
+            'user_id' => Auth::user()->id,
             'total' => $request->total,
             'status' => $request->status,
             'message' => $request->message,

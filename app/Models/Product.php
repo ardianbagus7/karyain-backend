@@ -12,6 +12,7 @@ class Product extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'name',
         'description',
         'category',
@@ -56,12 +57,19 @@ class Product extends Model
             ->where('product_id', $productId)
             ->where('status', 'SUCCESS')
             ->with(['user' => function ($query) {
-                $query->select('id','name','profile_photo_path');
+                $query->select('id', 'name', 'profile_photo_path');
             }])
             ->get(['message', 'total', 'created_at', 'user_id']);
     }
+
     public function user()
     {
         return $this->HasOne(User::class, 'id', 'user_id');
+    }
+
+    public function sortLatest()
+    {
+        return $this
+            ->orderBy('created_at', 'desc');
     }
 }
